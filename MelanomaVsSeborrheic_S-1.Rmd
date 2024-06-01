@@ -1,0 +1,298 @@
+---
+title: "MelanomavsSeborreic"
+author: "Jose Tamez"
+date: "4/24/2024"
+output: 
+  html_document: 
+    toc: true
+    fig_caption: true
+    number_sections: true
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE, warning = FALSE, message = FALSE,comment = "#>")
+
+```
+
+# Melanoma vs Seborreic_Keratosis
+
+
+```{r functions,echo = FALSE }
+
+library("FRESA.CAD")
+library("e1071")
+library(readxl)
+```
+
+## Loading data sets
+
+```{r}
+# /Users/joseantoniopalaciosdorbecker/Documents/Carrera/Semestre 6/Materias/Procesamiento/R/
+
+MelanomaFeatures <- read.csv("/Users/joseantoniopalaciosdorbecker/Documents/Carrera/Semestre 6/Materias/Procesamiento/R/Evidencia1/MelanomaLesionFeatures.csv", header=FALSE)
+MelanomaControlFeatures <- read.csv("/Users/joseantoniopalaciosdorbecker/Documents/Carrera/Semestre 6/Materias/Procesamiento/R/Evidencia1/MelanomaControlFeatures.csv", header=FALSE)
+
+SeborrheicFeatures <- read.csv("/Users/joseantoniopalaciosdorbecker/Documents/Carrera/Semestre 6/Materias/Procesamiento/R/Evidencia1/SeborrheicLesionFeatures.csv", header=FALSE)
+SeborrheicControlFeatures <- read.csv("/Users/joseantoniopalaciosdorbecker/Documents/Carrera/Semestre 6/Materias/Procesamiento/R/Evidencia1/SeborrheicControlFeatures.csv", header=FALSE)
+
+NevusFeatures <- read.csv("/Users/joseantoniopalaciosdorbecker/Documents/Carrera/Semestre 6/Materias/Procesamiento/R/Evidencia1/NevusLesionFeatures.csv", header=FALSE)
+NevusControlFeatures <- read.csv("/Users/joseantoniopalaciosdorbecker/Documents/Carrera/Semestre 6/Materias/Procesamiento/R/Evidencia1/NevusControlFeatures.csv", header=FALSE)
+
+#LesionFeatureNames <- read_excel("FeatureNames.xlsx")
+#ControlFeatureNames <- read_excel("FeatureNames.xlsx",sheet = "Control")
+#FeatureNames <- read_excel("FeatureNames.xlsx",sheet = "PerChannel")
+
+```
+
+## Data Conditioning
+
+```{r FRESA Map, results = "hide", dpi=300, fig.height= 6.0, fig.width= 8.0}
+op <- par(no.readonly = TRUE)
+
+
+colnames(MelanomaControlFeatures) <- paste("C",colnames(MelanomaControlFeatures),sep="")
+colnames(SeborrheicControlFeatures) <- paste("C",colnames(SeborrheicControlFeatures),sep="")
+colnames(NevusControlFeatures) <- paste("C",colnames(NevusControlFeatures),sep="")
+
+
+sum(is.na(MelanomaFeatures))
+sum(is.na(SeborrheicFeatures))
+sum(is.na(NevusFeatures))
+sum(is.na(MelanomaControlFeatures))
+sum(is.na(NevusControlFeatures))
+
+channel1 <- c(1:32)
+channel2 <- c(33:64)
+channel3 <- c(65:96)
+
+MMelanomaFeatures <- (  MelanomaFeatures[,channel1] +
+                        MelanomaFeatures[,channel2] +
+                        MelanomaFeatures[,channel3] )/3.0
+SMelanomaFeatures <- (  abs(MelanomaFeatures[,channel1] - MMelanomaFeatures) +
+                        abs(MelanomaFeatures[,channel2] - MMelanomaFeatures) +
+                        abs(MelanomaFeatures[,channel3] - MMelanomaFeatures) )/3.0
+
+colnames(MMelanomaFeatures) <- paste("M",colnames(MMelanomaFeatures),sep="")
+colnames(SMelanomaFeatures) <- paste("S",colnames(SMelanomaFeatures),sep="")
+
+MelanomaFeatures <- cbind(MelanomaFeatures,SMelanomaFeatures/(0.01+abs(MMelanomaFeatures)))
+
+MNevusFeatures <- (  NevusFeatures[,channel1] +
+                        NevusFeatures[,channel2] +
+                        NevusFeatures[,channel3] )/3.0
+SNevusFeatures <- (  abs(NevusFeatures[,channel1] - MNevusFeatures) +
+                        abs(NevusFeatures[,channel2] - MNevusFeatures) +
+                        abs(NevusFeatures[,channel3] - MNevusFeatures) )/3.0
+
+colnames(MNevusFeatures) <- paste("M",colnames(MNevusFeatures),sep="")
+colnames(SNevusFeatures) <- paste("S",colnames(SNevusFeatures),sep="")
+
+NevusFeatures <- cbind(NevusFeatures,SNevusFeatures/(0.001+abs(MNevusFeatures)))
+
+
+MSeborrheicFeatures <- (  SeborrheicFeatures[,channel1] +
+                          SeborrheicFeatures[,channel2] +
+                          SeborrheicFeatures[,channel3] )/3.0
+SSeborrheicFeatures <- (abs(SeborrheicFeatures[,channel1] - MSeborrheicFeatures) +
+                        abs(SeborrheicFeatures[,channel2] - MSeborrheicFeatures) +
+                        abs(SeborrheicFeatures[,channel3] - MSeborrheicFeatures))/3.0
+colnames(MSeborrheicFeatures) <- paste("M",colnames(MSeborrheicFeatures),sep="")
+colnames(SSeborrheicFeatures) <- paste("S",colnames(SSeborrheicFeatures),sep="")
+
+SeborrheicFeatures <- cbind(SeborrheicFeatures,SSeborrheicFeatures/(0.001+abs(MSeborrheicFeatures)))
+
+MMelanomaControlFeatures <- (  MelanomaControlFeatures[,channel1] +
+                               MelanomaControlFeatures[,channel2] +
+                               MelanomaControlFeatures[,channel3] )/3.0
+
+SMelanomaControlFeatures <- (abs(MelanomaControlFeatures[,channel1] - MMelanomaControlFeatures) +
+                             abs(MelanomaControlFeatures[,channel2] - MMelanomaControlFeatures) +
+                             abs(MelanomaControlFeatures[,channel3] - MMelanomaControlFeatures))/3.0
+colnames(MMelanomaControlFeatures) <- paste("M",colnames(MMelanomaControlFeatures),sep="")
+colnames(SMelanomaControlFeatures) <- paste("S",colnames(SMelanomaControlFeatures),sep="")
+
+
+MelanomaControlFeatures <- cbind(MelanomaControlFeatures,SMelanomaControlFeatures/(0.001+abs(MMelanomaControlFeatures)))
+
+MNevusControlFeatures <- (  NevusControlFeatures[,channel1] +
+                               NevusControlFeatures[,channel2] +
+                               NevusControlFeatures[,channel3] )/3.0
+SNevusControlFeatures <- (abs(NevusControlFeatures[,channel1] - MNevusControlFeatures) +
+                             abs(NevusControlFeatures[,channel2] - MNevusControlFeatures) +
+                             abs(NevusControlFeatures[,channel3] - MNevusControlFeatures))/3.0
+colnames(MNevusControlFeatures) <- paste("M",colnames(MNevusControlFeatures),sep="")
+colnames(SNevusControlFeatures) <- paste("S",colnames(SNevusControlFeatures),sep="")
+
+NevusControlFeatures <- cbind(NevusControlFeatures,SNevusControlFeatures/(0.001+abs(MNevusControlFeatures)))
+
+
+MSeborrheicControlFeatures <- (  SeborrheicControlFeatures[,channel1] +
+                                 SeborrheicControlFeatures[,channel2] +
+                                 SeborrheicControlFeatures[,channel3] )/3.0
+SSeborrheicControlFeatures <- (abs(SeborrheicControlFeatures[,channel1] - MSeborrheicControlFeatures) +
+                               abs(SeborrheicControlFeatures[,channel2] - MSeborrheicControlFeatures) +
+                               abs(SeborrheicControlFeatures[,channel3] - MSeborrheicControlFeatures))/3.0
+colnames(MSeborrheicControlFeatures) <- paste("M",colnames(MSeborrheicControlFeatures),sep="")
+colnames(SSeborrheicControlFeatures) <- paste("S",colnames(SSeborrheicControlFeatures),sep="")
+
+SeborrheicControlFeatures <- cbind(SeborrheicControlFeatures,
+                                   SSeborrheicControlFeatures/(0.001+abs(MSeborrheicControlFeatures)))
+
+
+
+CtrDiff <- MelanomaFeatures[,1:ncol(MelanomaControlFeatures)] - MelanomaControlFeatures;
+colnames(CtrDiff) <- colnames(MelanomaControlFeatures)
+MelanomaFeatures <- cbind(MelanomaFeatures,CtrDiff) 
+
+CtrDiff <- NevusFeatures[,1:ncol(MelanomaControlFeatures)] - NevusControlFeatures;
+colnames(CtrDiff) <- colnames(NevusControlFeatures)
+NevusFeatures <- cbind(NevusFeatures,CtrDiff) 
+
+
+CtrDiff <- SeborrheicFeatures[,1:ncol(MelanomaControlFeatures)] - SeborrheicControlFeatures;
+colnames(CtrDiff) <- colnames(SeborrheicControlFeatures)
+SeborrheicFeatures <- cbind(SeborrheicFeatures,CtrDiff)
+
+MelanomaFeatures <- MelanomaFeatures[complete.cases(MelanomaFeatures),]
+NevusFeatures <- NevusFeatures[complete.cases(NevusFeatures),]
+SeborrheicFeatures <- SeborrheicFeatures[complete.cases(SeborrheicFeatures),]
+
+
+MelanomaFeatures$Class <- rep(1,nrow(MelanomaFeatures))
+NevusFeatures$Class <- rep(0,nrow(NevusFeatures))
+SeborrheicFeatures$Class <- rep(0,nrow(SeborrheicFeatures))
+
+
+MelanomaSeborrheicNevus <- rbind(MelanomaFeatures,SeborrheicFeatures,NevusFeatures)
+
+table(MelanomaSeborrheicNevus$Class)
+
+
+```
+
+## The Heatmap
+```{r, dpi=300, fig.height= 6.0, fig.width= 8.0}
+
+hm <- heatMaps(Outcome = "Class",
+               data = MelanomaSeborrheicNevus[1:900,],
+               title = "Heat Map:",Scale = TRUE,
+cexRow = 0.75,cexCol = 0.5,srtCol = 45)
+
+par(op)
+```
+
+## Learning Melanoma with KNN
+
+```{r, , warning = FALSE}
+cvKNN <- randomCV(MelanomaSeborrheicNevus,"Class",
+               KNN_method,
+               trainFraction = 0.70,
+               repetitions = 10,
+               classSamplingType = "Ba",
+               featureSelectionFunction = univariate_KS,
+               featureSelection.control = list(limit= 30), # que nos regrese los 30 mas significativos
+               )
+
+# si se entrena balanceado, el punto donde hay cancer o no es de 0.5
+# el criterio de decisión del sistema depende de como fue entrenado el sistema
+# es mejor entrenar con todos los datos
+
+#MAD - mean absolute difference
+#Area Under Curve (AUC) representa el intervalo de confianza 
+# BACC - Balance Accuracy : Sensibility + Specificity / 2, area bajo curva verda
+
+```
+
+## KNN plot performance
+
+```{r, results='asis', warning = FALSE, dpi=300, fig.height= 6.0, fig.width= 6.0}
+performace <- predictionStats_binary(cvKNN$medianTest,"KNN")
+par(op)
+pander::pander(performace$aucs)
+pander::pander(performace$accc)
+pander::pander(performace$CM.analysis)
+
+```
+
+## SVM
+
+```{r}
+cvSVM <- randomCV(MelanomaSeborrheicNevus,"Class",
+               e1071::svm,
+               asFactor = TRUE,
+               trainSampleSets= cvKNN$trainSamplesSets, 
+               featureSelectionFunction = cvKNN$selectedFeaturesSet,
+               probability=TRUE
+               )
+
+```
+
+## SVM plot performance
+
+```{r , results='asis', dpi=300, fig.height= 6.0, fig.width= 6.0}
+performace <- predictionStats_binary(cvSVM$medianTest,"SVM")
+par(op)
+pander::pander(performace$aucs)
+pander::pander(performace$accc)
+pander::pander(performace$CM.analysis)
+
+# curva roc
+
+# sensitivity: Ppreb / Preal   
+# Especificidad = Npreb / Neg_real
+
+# circulo rojo es un predictor continuo, curva rock
+
+```
+
+
+## Learning Melanoma with Naive Bayes with PCA
+
+```{r}
+
+cvNB <- randomCV(MelanomaSeborrheicNevus,"Class",
+               NAIVE_BAYES,
+               trainSampleSets= cvKNN$trainSamplesSets,
+               featureSelectionFunction = cvKNN$selectedFeaturesSet
+               )
+
+```
+
+## NB performance
+
+```{r, results='asis', dpi=300, fig.height= 6.0, fig.width= 6.0}
+performace <- predictionStats_binary(cvNB$medianTest,"Naive Bayes with PCA")
+par(op)
+pander::pander(performace$aucs)
+pander::pander(performace$accc)
+pander::pander(performace$CM.analysis)
+
+```
+
+## Learning Melanoma with LASSO
+
+```{r , warning = FALSE}
+cvLASSO <- randomCV(MelanomaSeborrheicNevus,"Class",
+               LASSO_MIN,
+               trainSampleSets= cvKNN$trainSamplesSets, 
+               family="binomial")
+
+```
+
+## LASSO performance
+
+```{r , results='asis', warning = FALSE, dpi=300, fig.height= 6.0, fig.width= 6.0}
+performace <- predictionStats_binary(cvLASSO$medianTest,"LASSO")
+par(op)
+pander::pander(performace$aucs)
+pander::pander(performace$accc)
+pander::pander(performace$CM.analysis)
+
+```
+
+```{r, results='asis', warning = FALSE, dpi=300, fig.height= 4.0, fig.width= 7.0}
+barplot(cvLASSO$featureFrequency,las=2)
+```
+
